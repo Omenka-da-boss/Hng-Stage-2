@@ -4,7 +4,7 @@ GUIDE TO PROJECT
 
 Update and upgrade your srever and install docker and docker-compose
 
-clone the git repo in your server
+Clone the git repo in your server
 
 Cd into the git repo 
 
