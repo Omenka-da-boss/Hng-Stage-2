@@ -4,12 +4,18 @@ services:
   app_blue:
     image: ${BLUE_IMAGE}
     container_name: app_blue
+      environment:
+      - APP_POOL=green
+      - RELEASE_ID=${RELEASE_ID_BLUE}
     ports:
       - "8081:3000"
 
   app_green:
     image: ${GREEN_IMAGE}
     container_name: app_green
+      environment:
+      - APP_POOL=green
+      - RELEASE_ID=${RELEASE_ID_GREEN}
     ports:
       - "8082:3000"
 
