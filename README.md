@@ -1,6 +1,6 @@
-GUIDE TO PROJECT
+## GUIDE TO PROJECT
 
-## Cd into the home directory on your remote server or local machine
+Cd into the home directory on your remote server or local machine
 
 Update and upgrade your srever and install docker and docker-compose
 
