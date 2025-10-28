@@ -2,13 +2,13 @@ version: "3.9"
 
 services:
   app_blue:
-    image: yimikaade/wonderful:devops-stage-two
+    image: ${BLUE_IMAGE}
     container_name: app_blue
     ports:
       - "8081:3000"
 
   app_green:
-    image: yimikaade/wonderful:devops-stage-two
+    image: ${GREEN_IMAGE}
     container_name: app_green
     ports:
       - "8082:3000"
