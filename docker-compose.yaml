@@ -4,8 +4,8 @@ services:
   app_blue:
     image: ${BLUE_IMAGE}
     container_name: app_blue
-      environment:
-      - APP_POOL=green
+    environment:
+      - APP_POOL=blue
       - RELEASE_ID=${RELEASE_ID_BLUE}
     ports:
       - "8081:3000"
@@ -13,7 +13,7 @@ services:
   app_green:
     image: ${GREEN_IMAGE}
     container_name: app_green
-      environment:
+    environment:
       - APP_POOL=green
       - RELEASE_ID=${RELEASE_ID_GREEN}
     ports:
@@ -22,10 +22,42 @@ services:
   nginx:
     image: nginx:alpine
     container_name: nginx
-    ports:
-      - "8080:8080"
     depends_on:
       - app_blue
       - app_green
+    ports:
+      - "8080:8080"
+    environment:
+      - ACTIVE_POOL=${ACTIVE_POOL}
+      - RELEASE_ID=${RELEASE_ID_BLUE}
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      
+      - ./nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+      
+      - nginx-logs:/var/log/nginx
+    command: >
+      sh -c "envsubst '$$ACTIVE_POOL $$RELEASE_ID' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+      && nginx -g 'daemon off;'"
+
+ 
+  alert_watcher:
+    image: python:3.11-alpine
+    container_name: alert_watcher
+    depends_on:
+      - nginx
+    volumes:
+      - nginx-logs:/var/log/nginx:ro
+      - ./watcher:/app
+    working_dir: /app
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - ERROR_RATE_THRESHOLD=${ERROR_RATE_THRESHOLD}
+      - WINDOW_SIZE=${WINDOW_SIZE}
+      - ALERT_COOLDOWN_SEC=${ALERT_COOLDOWN_SEC}
+   env_file:
+      - .env   
+    command: >
+      sh -c "pip install requests && python watch.py"
+
+volumes:
+  nginx-logs:
