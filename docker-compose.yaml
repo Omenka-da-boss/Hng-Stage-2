@@ -57,7 +57,7 @@ services:
    env_file:
       - .env   
     command: >
-      sh -c "pip install requests && python watch.py"
+      sh -c "pip install -r requirement.txt && python watcher.py"
 
 volumes:
   nginx-logs:
