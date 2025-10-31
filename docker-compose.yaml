@@ -1,58 +1,54 @@
-version: "3.9"
+version: '3.9'
 
 services:
-  app_blue:
+  app-blue:
     image: ${BLUE_IMAGE}
-    container_name: app_blue
     environment:
       - APP_POOL=blue
       - RELEASE_ID=${RELEASE_ID_BLUE}
     ports:
       - "8081:3000"
 
-  app_green:
+  app-green:
     image: ${GREEN_IMAGE}
-    container_name: app_green
     environment:
-      - APP_POOL=green
+       - APP_POOL=green
       - RELEASE_ID=${RELEASE_ID_GREEN}
     ports:
       - "8082:3000"
 
   nginx:
     image: nginx:alpine
-    container_name: nginx
-    depends_on:
-      - app_blue
-      - app_green
     ports:
-      - "8080:8080"
-    environment:
-      - ACTIVE_POOL=${ACTIVE_POOL}
-      - RELEASE_ID=${RELEASE_ID_BLUE}
+      - "8060:8080"
     volumes:
-      
-      - ./nginx.conf.template:/etc/nginx/nginx.conf.template:ro
-      
+      - ./nginx.conf.template:/etc/nginx/nginx.conf.template
       - nginx-logs:/var/log/nginx
-
- 
-  alert_watcher:
-    image: python:3.11-alpine
-    container_name: alert_watcher
+    environment:
+      - ACTIVE_POOL=${ACTIVE_POOL:-blue}
+    command: >
+      sh -c "envsubst '$$ACTIVE_POOL' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
     depends_on:
-      - nginx
+      - app-blue
+      - app-green
+    labels:
+      - "traefik.enable=false"
+
+  alert-watcher:
+    build: 
+      context: .
+      dockerfile: Dockerfile.watcher
     volumes:
       - nginx-logs:/var/log/nginx:ro
-      - .:/app
-    working_dir: /app
     environment:
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
-      - ERROR_RATE_THRESHOLD=${ERROR_RATE_THRESHOLD}
-      - WINDOW_SIZE=${WINDOW_SIZE}
-      - ALERT_COOLDOWN_SEC=${ALERT_COOLDOWN_SEC}
-    command: >
-      sh -c "pip install -r requirement.txt && python watcher.py"
+      - ERROR_RATE_THRESHOLD=${ERROR_RATE_THRESHOLD:-2}
+      - WINDOW_SIZE=${WINDOW_SIZE:-200}
+      - ALERT_COOLDOWN_SEC=${ALERT_COOLDOWN_SEC:-300}
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
+    depends_on:
+      - nginx
+    restart: unless-stopped
 
 volumes:
   nginx-logs:
