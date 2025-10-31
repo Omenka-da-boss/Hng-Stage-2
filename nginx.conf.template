@@ -1,79 +1,48 @@
-user  nginx;
-worker_processes  auto;
-
-error_log  /var/log/nginx/error.log warn;
-pid        /var/run/nginx.pid;
-
-events {}
+events {
+    worker_connections 1024;
+}
 
 http {
-    include       /etc/nginx/mime.types;
-    default_type  application/octet-stream;
-    sendfile      on;
-    keepalive_timeout  65;
-    server_tokens off;
+    log_format custom_log '[$time_local] $remote_addr "$request" $status '
+                         '"$http_user_agent" $request_time $upstream_response_time '
+                         '"$upstream_addr" $upstream_status '
+                         '"$http_x_app_pool" "$http_x_release_id"';
 
-    
-    log_format enhanced_json escape=json
-      '{'
-        '"time_local":"$time_local",'
-        '"remote_addr":"$remote_addr",'
-        '"method":"$request_method",'
-        '"uri":"$request_uri",'
-        '"status":$status,'
-        '"body_bytes_sent":$body_bytes_sent,'
-        '"referer":"$http_referer",'
-        '"user_agent":"$http_user_agent",'
-        '"request_time":$request_time,'
-        '"upstream_response_time":"$upstream_response_time",'
-        '"upstream_status":"$upstream_status",'
-        '"upstream_addr":"$upstream_addr",'
-        '"pool":"$http_x_app_pool",'
-        '"release":"$http_x_release_id"'
-      '}';
+    access_log /var/log/nginx/access.log custom_log;
+    error_log /var/log/nginx/error.log;
 
-    access_log /var/log/nginx/access.log enhanced_json;
+    upstream blue_pool {
+        server app-blue:8080;
+    }
 
-  
-    upstream app_pooling {
-        server app_blue:3000  max_fails=2 fail_timeout=2s;
-        server app_green:3000 backup;
-        keepalive 16;
+    upstream green_pool {
+        server app-green:8080;
+    }
+
+    map $http_x_app_pool $active_pool {
+        default "${ACTIVE_POOL}_pool";
+        "blue" "blue_pool";
+        "green" "green_pool";
     }
 
     server {
-        listen 8080;
-        server_name localhost;
+        listen 80;
 
         location / {
-            proxy_pass http://app_pooling;
-
-           
-            proxy_next_upstream error timeout http_502 http_500 http_503 http_504;
-            proxy_next_upstream_tries 2;
-            proxy_connect_timeout 3s;
-            proxy_send_timeout 2s;
-            proxy_read_timeout 3s;
-            proxy_buffering off;
-
-            
-            proxy_set_header Host $host;
+            proxy_pass http://$active_pool;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-           
-            proxy_set_header X-App-Pool $ACTIVE_POOL;
-            proxy_set_header X-Release-Id $RELEASE_ID$;
-
-        
-            proxy_pass_header X-App-Pool;
-            proxy_pass_header X-Release-Id;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $host;
+            
+            # Capture upstream details
+            proxy_intercept_errors on;
         }
 
- 
+        # Health check endpoint
         location /health {
             access_log off;
-            return 200 'OK';
+            return 200 "healthy\n";
             add_header Content-Type text/plain;
         }
     }
